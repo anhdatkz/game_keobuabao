@@ -1,21 +1,26 @@
 from keras.models import load_model
 import cv2
 import numpy as np
-from random import choice
+from random import choice 
 
-REV_CLASS_MAP = {
-    0: "rock",
-    1: "paper",
-    2: "scissors",
-    3: "none"
-}
+#cac truong hop
+CASES  = ["rock", "paper", "scissors", "none"]
+
+#cac thanh phan tao khung
+X = [100, 500, 800, 1200, 50, 650, 400]
+Y = [100, 500, 50, 600]
+color = [(255,255,255), (0, 0, 255)] #BGR
+thickness = [2, 4]
+fontScale =[1,2]
+
+#vung anh
 
 
-def mapper(val):
-    return REV_CLASS_MAP[val]
+def Moves(val):
+    return CASES[val]
 
 
-def calculate_winner(move1, move2):
+def calcWinner(move1, move2):
     if move1 == move2:
         return "Tie"
 
@@ -37,64 +42,68 @@ def calculate_winner(move1, move2):
         if move2 == "rock":
             return "Computer"
 
-
+#load model train
 model = load_model("rock-paper-scissors-model.h5")
-
+#chụp video
 cap = cv2.VideoCapture(0)
 
-prev_move = None
+defaultMove = "none"
+compMoveName = "none"
+winner = "waiting..."
+#thiết lập khung hình
+cap.set(3, 1280) #width
+cap.set(4, 720) #height
 
-cap.set(4, 640)
-cap.set(3, 480)
-
-while True:
+while cap.isOpened():
+    #show video capture
     ret, frame = cap.read()
-    if not ret:
-        continue
-
-    # rectangle for user to play
-    cv2.rectangle(frame, (0, 200), (200,400), (255, 255, 255), 2)
-    # rectangle for computer to play
-    cv2.rectangle(frame, (440, 200), (640, 400), (255, 255, 255), 2)
-
-    # extract the region of image within the user rectangle
-    #roi = frame[100:100, 100:100]
-    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    
+# =============================================================================
+#     #kiểm tra nếu đọc khung hình ko đúng thì bỏ qua
+#     if not ret:
+#         continue 
+# =============================================================================
+   
+    # tạo khung người chơi
+    cv2.rectangle(frame, (X[0],Y[1]), (X[1],Y[0]), color[0], thickness[0])
+    # tạo khung máy chơi
+    cv2.rectangle(frame, (X[2],Y[1]), (X[3],Y[0]), color[0], thickness[0])
+    
+    #lấy hình ảnh nước đi của người chơi
+    player = frame[Y[0]:Y[1], X[0]:X[1]]
+    #tao khung mau cho video, chuyen bgr thanh rgb
+    img = cv2.cvtColor(player, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (227, 227))
 
-    # predict the move made
+    # dự đoán input
     pred = model.predict(np.array([img]))
-    move_code = np.argmax(pred[0])
-    user_move_name = mapper(move_code)
+    moveIndex = np.argmax(pred[0])
+    playerMoveName = Moves(moveIndex)
 
-    # predict the winner (human vs computer)
-    if prev_move != user_move_name:
-        if user_move_name != "none":
-            computer_move_name = choice(['rock', 'paper', 'scissors'])
-            winner = calculate_winner(user_move_name, computer_move_name)
+    # dự đoán thắng thua
+    if defaultMove != playerMoveName:
+        if playerMoveName != "none":
+            compMoveName = choice(['rock', 'paper', 'scissors'])
+            winner = calcWinner(playerMoveName, compMoveName)
         else:
-            computer_move_name = "none"
+            compMoveName = "none"
             winner = "Waiting..."
-    prev_move = user_move_name
+    defaultMove = playerMoveName
 
-    # display the information
+    # viết chú thích trên hình ảnh
     font = cv2.FONT_HERSHEY_SIMPLEX
-    cv2.putText(frame, "Your Move: " + user_move_name,
-                (50, 100), font, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(frame, "Computer's Move: " + computer_move_name,
-                (400, 100), font, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(frame, "Winner: " + winner,
-                (200, 450), font, 1, (0, 0, 255), 4, cv2.LINE_AA)
+    cv2.putText(frame, "Your Move: " + playerMoveName, (X[4], Y[2]), font, fontScale[0], color[0], thickness[0], cv2.LINE_AA)
+    cv2.putText(frame, "Computer's Move: " + compMoveName, (X[5], Y[2]), font, fontScale[0], color[0], thickness[0], cv2.LINE_AA)
+    cv2.putText(frame, "Winner: " + winner, (X[6], Y[3]), font, fontScale[1], color[1], thickness[1], cv2.LINE_AA)
 
-    if computer_move_name != "none":
-        icon = cv2.imread("images/{}.png".format(computer_move_name))
-        icon = cv2.resize(icon, (200, 200))
-        frame[200:400, 440:640] = icon
+    if compMoveName != "none":
+        icon = cv2.imread("images/{}.png".format(compMoveName))
+        icon = cv2.resize(icon, (400, 400))
+        frame[Y[0]:Y[1], X[2]:X[3]] = icon
+        
+    cv2.imshow("Game keo bua bao", frame)
 
-    cv2.imshow("Rock Paper Scissors", frame)
-
-    k = cv2.waitKey(10)
-    if k == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 cap.release()
